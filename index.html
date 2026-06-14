@@ -534,14 +534,44 @@ $('notif-toggle').classList.toggle('on',notifs);
 $('notif-toggle').addEventListener('click',e=>{e.stopPropagation();notifs=!notifs;localStorage.setItem('sg_notif',notifs?'1':'0');$('notif-toggle').classList.toggle('on',notifs);toast(notifs?'Уведомления включены 🔔':'Выключены 🔕');});
 $('mp-notif').addEventListener('click',()=>{notifs=!notifs;localStorage.setItem('sg_notif',notifs?'1':'0');$('notif-toggle').classList.toggle('on',notifs);toast(notifs?'Уведомления включены 🔔':'Выключены 🔕');closeMorePop();});
 
+
+let totalUnread=0;
+function updateTabBadge(){
+  const count=Object.values(dmUnread).reduce((a,b)=>a+b,0);
+  totalUnread=count;
+  document.title=count>0?`(${count}) Sigmagram`:'Sigmagram';
+}
+
 window.addEventListener('focus',()=>{windowFocused=true;document.title='Sigmagram';});
 window.addEventListener('blur',()=>{windowFocused=false;});
 
+function playNotifSound(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator();const g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.frequency.setValueAtTime(880,ctx.currentTime);
+    o.frequency.setValueAtTime(1100,ctx.currentTime+0.1);
+    g.gain.setValueAtTime(0.15,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.3);
+    o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);
+  }catch(e){}
+}
+
 function tryNotif(user,text){
-  if(!notifs||windowFocused)return;
-  if('Notification' in window&&Notification.permission==='granted')
-    new Notification(`${user} — Sigmagram`,{body:text||'📷',icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="%232AABEE"/></svg>'});
-  else if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
+  updateTabBadge();
+  if(!notifs)return;
+  playNotifSound();
+  if('Notification' in window&&Notification.permission==='granted'){
+    const n=new Notification(`${user} — Sigmagram`,{body:text||'📷',icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="%232AABEE"/><text x="16" y="21" text-anchor="middle" font-size="18" fill="white">S</text></svg>',tag:'sg-msg',silent:true});
+    setTimeout(()=>n.close(),4000);
+  } else if('Notification' in window&&Notification.permission==='default'){
+    Notification.requestPermission();
+  }
+}
+
+function requestNotifPermission(){
+  if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
 }
 
 /* TOAST */
@@ -782,10 +812,10 @@ function renderDmRows(){
     if(c.lastTime)rm.innerHTML+=`<div class="rt">${c.lastTime}</div>`;
     if(dmUnread[c.nick])rm.innerHTML+=`<div class="bdg">${dmUnread[c.nick]}</div>`;
     row.appendChild(avDiv);row.appendChild(ri);row.appendChild(rm);
-    row.addEventListener('click',()=>{delete dmUnread[c.nick];renderDmRows();openDmChat(c.nick,av,dn);gotoChat();});
+    row.addEventListener('click',()=>{delete dmUnread[c.nick];renderDmRows();updateTabBadge();openDmChat(c.nick,av,dn);gotoChat();});
     wrap.appendChild(row);
   });
-  if(typeof renderGrpRows==='function')renderGrpRows();
+  if(typeof renderGrpRows==='function'&&typeof groups!=='undefined')renderGrpRows();
 }
 
 /* INCOMING DMs */
@@ -1054,6 +1084,7 @@ window._doLoginCb=async function(v){
   if(!myDisplayName){myDisplayName=v;localStorage.setItem('sg_displayname',v);}
   syncMeUI();fullReRender();renderDmRows();
   goOnline();startHeartbeat();subscribeUsers();subscribeIncomingDMs();subscribeSavedChat();
+  requestNotifPermission();
 };
 if(window._pendingLogin){setTimeout(()=>{if(window._doLoginCb)window._doLoginCb(window._pendingLogin);window._pendingLogin=null;},0);}
 
