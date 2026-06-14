@@ -494,7 +494,9 @@ let windowFocused=true;
 let currentChat='saved', chatUnsub=null;
 let usersMap={}, usersUnsub=null;
 let incomingDmsUnsub=null, dmUnread={}, seenDmIds=new Set();
-let dmOtherReadAt=0, dmReadUnsub=null; // for DM read receipts
+let dmOtherReadAt=0, dmReadUnsub=null;
+let groups=JSON.parse(localStorage.getItem('sg_groups')||'[]');
+let newGrpAv='', editGrpId=null, editGrpAv='';
 
 const COLORS=['#2AABEE','#e8534c','#8e44ad','#27ae60','#e67e22','#2980b9','#16a085','#c0392b'];
 function nickColor(n){let h=0;for(let c of(n||'a'))h=(h*31+c.charCodeAt(0))%COLORS.length;return COLORS[h];}
@@ -1104,10 +1106,6 @@ if(myNick){
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ── GROUPS ─────────────────────────────────────────────────── */
-let groups = JSON.parse(localStorage.getItem('sg_groups')||'[]');
-let newGrpAv = '';
-let editGrpId = null, editGrpAv = '';
-
 function saveGroups(){localStorage.setItem('sg_groups',JSON.stringify(groups));}
 
 function renderGrpRows(){
