@@ -785,6 +785,7 @@ function renderDmRows(){
     row.addEventListener('click',()=>{delete dmUnread[c.nick];renderDmRows();openDmChat(c.nick,av,dn);gotoChat();});
     wrap.appendChild(row);
   });
+  if(typeof renderGrpRows==='function')renderGrpRows();
 }
 
 /* INCOMING DMs */
