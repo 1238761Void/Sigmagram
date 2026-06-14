@@ -587,8 +587,18 @@ window.closeOv=closeOv;
 
 /* MOBILE */
 const isMob=()=>window.innerWidth<=700;
-function gotoChat(){if(isMob())$('sidebar').classList.add('hidden');}
-function gotoSb(){if(isMob())$('sidebar').classList.remove('hidden');}
+function gotoChat(){
+  if(isMob()){
+    $('sidebar').classList.add('hidden');
+    $('cwin').style.display='';
+  }
+}
+function gotoSb(){
+  if(isMob()){
+    $('sidebar').classList.remove('hidden');
+    $('cwin').style.display='none';
+  }
+}
 window.gotoChat=gotoChat;
 $('back-btn').addEventListener('click',gotoSb);
 $('row-main').addEventListener('click',()=>{openSavedChat();gotoChat();});
@@ -1069,6 +1079,8 @@ function syncMeUI(){
   $('dsub').textContent=myNick?`@${myNick.toLowerCase()}`:'@sigmagram';
 }
 syncMeUI();
+// On mobile, start with sidebar visible, chat hidden
+if(isMob())$('cwin').style.display='none';
 
 /* LOGIN CALLBACK */
 window._doLoginCb=async function(v){
