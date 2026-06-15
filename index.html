@@ -44,10 +44,13 @@ body{font-family:'Inter',-apple-system,sans-serif;background:#6b9bd2;display:fle
 .sdrop.on{display:block}
 .sdrop-empty{padding:16px;text-align:center;font-size:13px;color:var(--sec)}
 .lst{flex:1;overflow-y:auto;position:relative}
-.row{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;transition:background .12s;position:relative}
+.row{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;transition:background .12s;position:relative;overflow:hidden;user-select:none}
 .row:hover{background:var(--hov)}
 .row.on{background:color-mix(in srgb,var(--blue) 12%,transparent)}
 .row::after{content:'';position:absolute;bottom:0;left:70px;right:0;height:1px;background:var(--div)}
+.row-inner{display:flex;align-items:center;gap:12px;width:100%;transition:transform .2s;pointer-events:none}
+.row-del-bg{position:absolute;right:0;top:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;gap:4px;opacity:0;transition:opacity .15s;pointer-events:none}
+.row.swiping .row-del-bg{opacity:1}
 
 /* avatars */
 .av{width:52px;height:52px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff;overflow:visible;user-select:none;position:relative}
@@ -336,14 +339,47 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
 </div>
 
+<!-- ROW CONTEXT MENU -->
+<div class="ctx" id="row-ctx" style="min-width:160px">
+  <div class="cxi" id="row-ctx-profile"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Профиль</div>
+  <div class="cxi red" id="row-ctx-del"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M9 6V4h6v2"/></svg>Удалить чат</div>
+</div>
+
+<!-- PEER PROFILE MODAL -->
+<div class="ov" id="ov-peer">
+  <div class="mdl" style="text-align:center;max-width:320px">
+    <div id="peer-av" style="width:80px;height:80px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#fff;background:#2AABEE;overflow:hidden"></div>
+    <h2 id="peer-name" style="margin-bottom:4px"></h2>
+    <p id="peer-nick" style="font-size:13px;color:var(--sec);margin-bottom:4px"></p>
+    <p id="peer-status" style="font-size:12px;color:var(--sec);margin-bottom:16px"></p>
+    <button class="btn" id="peer-msg">Написать сообщение</button>
+    <button class="btn g" onclick="closeOv('ov-peer')">Закрыть</button>
+  </div>
+</div>
+
+<!-- DELETE CHAT MODAL -->
+<div class="ov" id="ov-del-chat">
+  <div class="mdl" style="max-width:320px">
+    <h2>Удалить чат?</h2>
+    <p style="margin-top:-6px;margin-bottom:16px;font-size:13px;color:var(--sec)" id="del-chat-desc">Чат исчезнет из списка только у тебя</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn" id="del-chat-confirm" style="background:var(--red);color:#fff">Удалить</button>
+      <button class="btn g" onclick="closeOv('ov-del-chat')">Отмена</button>
+    </div>
+  </div>
+</div>
+
 <!-- DELETE MODAL -->
 <div class="ov" id="ov-del">
   <div class="mdl" style="max-width:320px">
     <h2>Удалить сообщение?</h2>
     <p style="margin-top:-6px;margin-bottom:16px;font-size:13px;color:var(--sec)">Выбери у кого удалить</p>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn" id="del-all" style="background:var(--red);color:#fff">Удалить у всех</button>
-      <button class="btn" id="del-me" style="background:var(--hov);color:var(--text)">Удалить у меня</button>
+      <button class="btn" id="del-all" style="background:var(--red);color:#fff">🗑 Удалить у всех</button>
+      <button class="btn" id="del-me" style="background:var(--hov);color:var(--sec);position:relative;overflow:hidden;user-select:none" title="Зажми чтобы удалить только у себя">
+        <span id="del-me-label">Удалить только у себя — зажми</span>
+        <div id="del-me-bar" style="position:absolute;left:0;top:0;bottom:0;width:0%;background:rgba(229,57,53,.25);transition:width .05s linear;pointer-events:none"></div>
+      </button>
       <button class="btn g" onclick="closeOv('ov-del')">Отмена</button>
     </div>
   </div>
@@ -804,7 +840,7 @@ function openDmChat(otherNick,otherAv,otherDn){
   setAv($('ch-av'),otherNick,av);
   $('ch-av').style.fontSize='';
   $('ch-name').textContent=dn;updateChatStatus();
-  $('ch-ci').onclick=null;
+  $('ch-ci').onclick=()=>openPeerProfile(otherNick);
   $('row-main').classList.remove('on');document.querySelectorAll('#dm-rows .row').forEach(r=>r.classList.toggle('on',r.dataset.nick===otherNick));
   document.querySelectorAll('#msgs .mr').forEach(e=>e.remove());showPinBar();
   const chatId=dmChatId(myNick,otherNick);
@@ -828,12 +864,90 @@ function openDmChat(otherNick,otherAv,otherDn){
   });
 }
 
+let pendingDelChat=null;
+function confirmDelChat(nick,isGrp){
+  pendingDelChat={nick,isGrp};
+  $('del-chat-desc').textContent=isGrp?'Группа исчезнет из твоего списка':'Чат исчезнет из списка только у тебя';
+  openOv('ov-del-chat');
+}
+$('del-chat-confirm').addEventListener('click',()=>{
+  closeOv('ov-del-chat');
+  if(!pendingDelChat)return;
+  const {nick,isGrp}=pendingDelChat;pendingDelChat=null;
+  if(isGrp){
+    groups=groups.filter(g=>g.id!==nick);saveGroups();
+    if(currentChat===`grp:${nick}`)openSavedChat();
+    renderGrpRows();toast('Группа удалена из списка');
+  } else {
+    contacts=contacts.filter(c=>c.nick!==nick);saveContacts();
+    if(currentChat===`dm:${nick}`)openSavedChat();
+    renderDmRows();toast('Чат удалён из списка');
+  }
+});
+
+/* ROW CONTEXT MENU */
+let rowCtxTarget=null;
+const rowCtxEl=$('row-ctx');
+document.addEventListener('click',e=>{if(!rowCtxEl.contains(e.target))rowCtxEl.style.display='none';});
+function showRowCtx(e,nick,isGrp){
+  e.preventDefault();e.stopPropagation();
+  rowCtxTarget={nick,isGrp};
+  $('row-ctx-profile').style.display=isGrp?'none':'flex';
+  const x=Math.min(e.clientX||e.touches?.[0]?.clientX||0,window.innerWidth-170);
+  const y=Math.min(e.clientY||e.touches?.[0]?.clientY||0,window.innerHeight-100);
+  rowCtxEl.style.cssText=`display:block;position:fixed;left:${x}px;top:${y}px;z-index:9000`;
+}
+$('row-ctx-del').addEventListener('click',()=>{
+  rowCtxEl.style.display='none';
+  if(!rowCtxTarget)return;
+  confirmDelChat(rowCtxTarget.nick,rowCtxTarget.isGrp);
+});
+$('row-ctx-profile').addEventListener('click',()=>{
+  rowCtxEl.style.display='none';
+  if(!rowCtxTarget)return;
+  openPeerProfile(rowCtxTarget.nick);
+});
+
+/* PEER PROFILE */
+function openPeerProfile(nick){
+  const c=contacts.find(x=>x.nick===nick)||{};
+  const u=usersMap[nick]||{};
+  const av=c.av||u.av||'';
+  const dn=c.dn||u.displayName||nick;
+  const online=u.online;
+  const avEl=$('peer-av');
+  if(av){avEl.innerHTML='';const img=document.createElement('img');img.src=av;img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%';avEl.appendChild(img);avEl.style.background='transparent';}
+  else{avEl.innerHTML=(nick[0]||'?').toUpperCase();avEl.style.background=nickColor(nick);}
+  $('peer-name').textContent=dn;
+  $('peer-nick').textContent=`@${nick}`;
+  $('peer-status').textContent=online?'🟢 онлайн':'⚪ не в сети';
+  $('peer-msg').onclick=()=>{closeOv('ov-peer');openDmChat(nick,av,dn);gotoChat();};
+  openOv('ov-peer');
+}
+
+function addSwipe(row,onDelete){
+  let startX=0,dx=0,swiping=false;
+  const THRESHOLD=60;
+  row.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;dx=0;swiping=false;},{passive:true});
+  row.addEventListener('touchmove',e=>{
+    dx=e.touches[0].clientX-startX;
+    if(Math.abs(dx)>8&&dx<0){swiping=true;const inner=row.querySelector('.row-inner');if(inner)inner.style.transform=`translateX(${Math.max(dx,-80)}px)`;row.classList.add('swiping');}
+  },{passive:true});
+  row.addEventListener('touchend',()=>{
+    const inner=row.querySelector('.row-inner');
+    if(swiping&&dx<-THRESHOLD){inner&&(inner.style.transform='');row.classList.remove('swiping');onDelete();}
+    else{inner&&(inner.style.transform='');row.classList.remove('swiping');}
+    swiping=false;
+  },{passive:true});
+}
+
 function renderDmRows(){
   const wrap=$('dm-rows');wrap.innerHTML='';
   contacts.forEach(c=>{
     const u=usersMap[c.nick]||{};const io=u.online;const av=c.av||u.av||'';const dn=c.dn||u.displayName||c.nick;
     const row=document.createElement('div');row.className='row';row.dataset.nick=c.nick;
     if(currentChat===`dm:${c.nick}`)row.classList.add('on');
+    const inner=document.createElement('div');inner.className='row-inner';
     const avDiv=document.createElement('div');avDiv.className=`av ${io?'online-dot':'offline-dot'}`;
     setAv(avDiv,c.nick,av);
     const ri=document.createElement('div');ri.className='ri';
@@ -841,8 +955,20 @@ function renderDmRows(){
     const rm=document.createElement('div');rm.className='rm';
     if(c.lastTime)rm.innerHTML+=`<div class="rt">${c.lastTime}</div>`;
     if(dmUnread[c.nick])rm.innerHTML+=`<div class="bdg">${dmUnread[c.nick]}</div>`;
-    row.appendChild(avDiv);row.appendChild(ri);row.appendChild(rm);
+    inner.appendChild(avDiv);inner.appendChild(ri);inner.appendChild(rm);
+    const menuBtn=document.createElement('button');
+    menuBtn.className='ic row-menu-btn';menuBtn.style.cssText='width:32px;height:32px;flex-shrink:0;opacity:0;transition:opacity .15s';
+    menuBtn.innerHTML='<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>';
+    menuBtn.addEventListener('click',e=>{e.stopPropagation();showRowCtx(e,c.nick,false);});
+    inner.appendChild(menuBtn);
+    row.addEventListener('mouseenter',()=>menuBtn.style.opacity='1');
+    row.addEventListener('mouseleave',()=>menuBtn.style.opacity='0');
+    row.addEventListener('contextmenu',e=>showRowCtx(e,c.nick,false));
+    const delBg=document.createElement('div');delBg.className='row-del-bg';
+    delBg.innerHTML='<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M9 6V4h6v2"/></svg>Удалить';
+    row.appendChild(inner);row.appendChild(delBg);
     row.addEventListener('click',()=>{delete dmUnread[c.nick];renderDmRows();updateTabBadge();openDmChat(c.nick,av,dn);gotoChat();});
+    addSwipe(row,()=>confirmDelChat(c.nick,false));
     wrap.appendChild(row);
   });
   if(typeof renderGrpRows==='function'&&typeof groups!=='undefined')renderGrpRows();
@@ -992,17 +1118,37 @@ $('del-all').addEventListener('click',async()=>{
   await deleteDoc(getChatDocRef(ctxId));
   toast('Удалено у всех');
 });
-$('del-me').addEventListener('click',async()=>{
-  closeOv('ov-del');
-  if(!ctxId)return;
-  // For "delete for me only" — mark as deleted_for with my nick
-  try{
-    await updateDoc(getChatDocRef(ctxId),{deletedFor:myNick});
-  }catch(e){
-    await deleteDoc(getChatDocRef(ctxId));
+
+// Hold-to-confirm for del-me
+{
+  const btn=$('del-me'),bar=$('del-me-bar');
+  const HOLD=1500;
+  let timer=null,start=null,raf=null;
+  function startHold(){
+    start=Date.now();
+    function tick(){
+      const p=Math.min((Date.now()-start)/HOLD*100,100);
+      bar.style.width=p+'%';
+      if(p<100)raf=requestAnimationFrame(tick);
+      else{bar.style.width='0%';doDelMe();}
+    }
+    raf=requestAnimationFrame(tick);
   }
-  toast('Удалено у тебя');
-});
+  function cancelHold(){cancelAnimationFrame(raf);bar.style.width='0%';}
+  async function doDelMe(){
+    closeOv('ov-del');
+    if(!ctxId)return;
+    try{await updateDoc(getChatDocRef(ctxId),{deletedFor:myNick});}
+    catch(e){await deleteDoc(getChatDocRef(ctxId));}
+    toast('Удалено у тебя');
+  }
+  btn.addEventListener('mousedown',startHold);
+  btn.addEventListener('touchstart',startHold,{passive:true});
+  btn.addEventListener('mouseup',cancelHold);
+  btn.addEventListener('mouseleave',cancelHold);
+  btn.addEventListener('touchend',cancelHold,{passive:true});
+  btn.addEventListener('touchcancel',cancelHold,{passive:true});
+}
 $('edit-cancel').addEventListener('click',()=>{editingId=null;$('msg-in').value='';$('msg-in').dispatchEvent(new Event('input'));$('estrip').classList.remove('on');});
 
 /* SEND ICON */
@@ -1193,18 +1339,30 @@ function subscribeUserGroups(){
 }
 
 function renderGrpRows(){
-  // Remove old group rows
   document.querySelectorAll('#dm-rows .row[data-grp]').forEach(r=>r.remove());
   groups.forEach(g=>{
     const row=document.createElement('div');
     row.className='row';row.dataset.grp=g.id;
+    if(currentChat===`grp:${g.id}`)row.classList.add('on');
+    const inner=document.createElement('div');inner.className='row-inner';
     const avDiv=document.createElement('div');avDiv.className='av';
     if(g.av){const img=document.createElement('img');img.className='av-img';img.src=g.av;avDiv.appendChild(img);}
     else{avDiv.textContent='👥';avDiv.style.background='#8e44ad';avDiv.style.fontSize='20px';}
     const ri=document.createElement('div');ri.className='ri';
     ri.innerHTML=`<div class="rn">${esc(g.name)}<span class="grp-badge">группа</span></div><div class="rs">${g.members.length} участн.</div>`;
-    row.appendChild(avDiv);row.appendChild(ri);
+    inner.appendChild(avDiv);inner.appendChild(ri);
+    const menuBtn=document.createElement('button');
+    menuBtn.className='ic row-menu-btn';menuBtn.style.cssText='width:32px;height:32px;flex-shrink:0;opacity:0;transition:opacity .15s';
+    menuBtn.innerHTML='<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>';
+    menuBtn.addEventListener('click',e=>{e.stopPropagation();showRowCtx(e,g.id,true);});
+    inner.appendChild(menuBtn);
+    row.addEventListener('mouseenter',()=>menuBtn.style.opacity='1');
+    row.addEventListener('mouseleave',()=>menuBtn.style.opacity='0');
+    row.addEventListener('contextmenu',e=>showRowCtx(e,g.id,true));
+    delBg.innerHTML='<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M9 6V4h6v2"/></svg>Удалить';
+    row.appendChild(inner);row.appendChild(delBg);
     row.addEventListener('click',()=>{openGrpChat(g.id);gotoChat();});
+    addSwipe(row,()=>confirmDelChat(g.id,true));
     $('dm-rows').appendChild(row);
   });
 }
@@ -1302,7 +1460,7 @@ function openEditGrp(gid){
   if(g.av){avEl.innerHTML='';const img=document.createElement('img');img.src=g.av;img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%';avEl.appendChild(img);}
   else{avEl.innerHTML='👥';avEl.style.background='#8e44ad';avEl.style.fontSize='22px';}
   // Show delete button only for group owner
-  const isOwner=g.createdBy===myNick;
+  const isOwner=(g.createdBy===myNick)||(g.createdBy==null&&g.members&&g.members[0]===myNick);
   $('editgrp-del').style.display=isOwner?'block':'none';
   // Member list
   const wrap=$('editgrp-memberlist');wrap.innerHTML='';
